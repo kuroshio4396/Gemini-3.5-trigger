@@ -68,26 +68,19 @@ export default async function handler(req, res) {
       return res.json(tags);
     }
 
-    let client;
-    if (apiKey) {
-      client = new GoogleGenAI({
-        apiKey: apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          },
-        },
-      });
-    } else {
-      client = new GoogleGenAI({
-        apiKey: process.env.GEMINI_API_KEY,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          },
-        },
-      });
+    const finalApiKey = apiKey || process.env.GEMINI_API_KEY;
+    if (!finalApiKey) {
+      throw new Error('未配置 API Key。请在设置中配置您的 API Key，或在服务器部署环境中配置 GEMINI_API_KEY 环境变量。');
     }
+
+    const client = new GoogleGenAI({
+      apiKey: finalApiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
 
     const aiResponse = await client.models.generateContent({
       model: selectedModel,
