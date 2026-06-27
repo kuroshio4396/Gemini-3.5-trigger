@@ -1,0 +1,6 @@
+{
+  "name": "ComfyUI Image Prompt Reverse Engine",
+  "description": "An image-to-prompt AI tool that analyzes uploaded images and reverse-engineers them into structured, bilingual ComfyUI/Stable Diffusion prompt tags categorized by Style, Character, Action, Environment, and Composition.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
