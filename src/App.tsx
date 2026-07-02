@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Camera, Settings as SettingsIcon } from 'lucide-react';
+import { Camera, Settings as SettingsIcon, Image as ImageIcon, Type as TypeIcon } from 'lucide-react';
 import { ImageUploader } from './components/ImageUploader';
 import { PromptResults } from './components/PromptResults';
 import { PromptData, AppSettings } from './types';
@@ -9,6 +9,9 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [promptData, setPromptData] = useState<PromptData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  const [inputType, setInputType] = useState<'image' | 'text'>('image');
+  const [textInput, setTextInput] = useState('');
 
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('promptrefine_settings');
@@ -51,6 +54,43 @@ export default function App() {
       if (!response.ok) {
         const errData = await response.json();
         throw new Error(errData.error || 'Failed to analyze image');
+      }
+
+      const data: PromptData = await response.json();
+      setPromptData(data);
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTextSubmit = async () => {
+    if (!textInput.trim()) return;
+    
+    setIsLoading(true);
+    setError(null);
+    setPromptData(null);
+
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          textInput: textInput.trim(),
+          apiProvider: settings.apiProvider,
+          apiKey: settings.apiKey,
+          model: settings.model,
+          filterR18
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Failed to analyze text');
       }
 
       const data: PromptData = await response.json();
@@ -110,9 +150,43 @@ export default function App() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
             <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center shrink-0">
               <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">Input Source</span>
+              <div className="flex gap-1 bg-slate-200 p-1 rounded-lg">
+                <button
+                  onClick={() => setInputType('image')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 ${inputType === 'image' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  图片
+                </button>
+                <button
+                  onClick={() => setInputType('text')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 ${inputType === 'text' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <TypeIcon className="w-3.5 h-3.5" />
+                  文本
+                </button>
+              </div>
             </div>
             <div className="flex-1 bg-slate-200 flex flex-col relative">
-              <ImageUploader onImageSelected={handleImageSelected} isLoading={isLoading} />
+              {inputType === 'image' ? (
+                <ImageUploader onImageSelected={handleImageSelected} isLoading={isLoading} />
+              ) : (
+                <div className="flex flex-col h-full bg-white p-4">
+                  <textarea
+                    value={textInput}
+                    onChange={(e) => setTextInput(e.target.value)}
+                    placeholder="请输入对画面的文本描述..."
+                    className="flex-1 w-full resize-none p-3 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                  />
+                  <button
+                    onClick={handleTextSubmit}
+                    disabled={isLoading || !textInput.trim()}
+                    className="mt-4 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg disabled:opacity-50 transition-colors"
+                  >
+                    {isLoading ? '处理中...' : '生成提示词'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           

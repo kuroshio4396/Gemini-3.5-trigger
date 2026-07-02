@@ -14,7 +14,7 @@ export interface PromptData {
 export type Category = keyof PromptData;
 
 export interface AppSettings {
-  apiProvider?: 'google' | 'openrouter';
+  apiProvider?: 'google' | 'openrouter' | 'kimi';
   apiKey: string;
   model: string;
 }
