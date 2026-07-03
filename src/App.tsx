@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Camera, Settings as SettingsIcon, Image as ImageIcon, Type as TypeIcon } from 'lucide-react';
+import { Camera, Settings as SettingsIcon, Image as ImageIcon, Type as TypeIcon, Layers } from 'lucide-react';
 import { ImageUploader } from './components/ImageUploader';
 import { PromptResults } from './components/PromptResults';
+import { BatchProcessor } from './components/BatchProcessor';
 import { PromptData, AppSettings } from './types';
 import { SettingsModal } from './components/SettingsModal';
 
@@ -10,7 +11,7 @@ export default function App() {
   const [promptData, setPromptData] = useState<PromptData | null>(null);
   const [error, setError] = useState<string | null>(null);
   
-  const [inputType, setInputType] = useState<'image' | 'text'>('image');
+  const [inputType, setInputType] = useState<'image' | 'text' | 'batch'>('image');
   const [textInput, setTextInput] = useState('');
 
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -165,12 +166,19 @@ export default function App() {
                   <TypeIcon className="w-3.5 h-3.5" />
                   文本
                 </button>
+                <button
+                  onClick={() => setInputType('batch')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 ${inputType === 'batch' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  批量
+                </button>
               </div>
             </div>
             <div className="flex-1 bg-slate-200 flex flex-col relative">
               {inputType === 'image' ? (
                 <ImageUploader onImageSelected={handleImageSelected} isLoading={isLoading} />
-              ) : (
+              ) : inputType === 'text' ? (
                 <div className="flex flex-col h-full bg-white p-4">
                   <textarea
                     value={textInput}
@@ -186,6 +194,12 @@ export default function App() {
                     {isLoading ? '处理中...' : '生成提示词'}
                   </button>
                 </div>
+              ) : (
+                <BatchProcessor 
+                  settings={settings} 
+                  filterR18={filterR18} 
+                  onViewResult={(data) => setPromptData(data)} 
+                />
               )}
             </div>
           </div>
