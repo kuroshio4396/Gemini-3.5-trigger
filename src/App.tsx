@@ -14,6 +14,8 @@ export default function App() {
   const [inputType, setInputType] = useState<'image' | 'text' | 'batch'>('image');
   const [textInput, setTextInput] = useState('');
 
+  const [multiCharacterMode, setMultiCharacterMode] = useState(false);
+
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('promptrefine_settings');
     if (saved) {
@@ -48,7 +50,8 @@ export default function App() {
           apiProvider: settings.apiProvider,
           apiKey: settings.apiKey,
           model: settings.model,
-          filterR18
+          filterR18,
+          multiCharacterMode
         }),
       });
 
@@ -85,7 +88,8 @@ export default function App() {
           apiProvider: settings.apiProvider,
           apiKey: settings.apiKey,
           model: settings.model,
-          filterR18
+          filterR18,
+          multiCharacterMode
         }),
       });
 
@@ -118,6 +122,17 @@ export default function App() {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setMultiCharacterMode(!multiCharacterMode)}
+            className={`text-sm font-semibold px-4 py-1.5 rounded-lg shadow-sm transition-colors flex items-center gap-2 border ${
+              multiCharacterMode 
+                ? 'bg-amber-100 border-amber-200 text-amber-700 hover:bg-amber-200' 
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-current"></span>
+            多人内容识别 {multiCharacterMode ? '已开启' : '未开启'}
+          </button>
           <button
             onClick={() => setFilterR18(!filterR18)}
             className={`text-sm font-semibold px-4 py-1.5 rounded-lg shadow-sm transition-colors flex items-center gap-2 border ${
@@ -198,6 +213,7 @@ export default function App() {
                 <BatchProcessor 
                   settings={settings} 
                   filterR18={filterR18} 
+                  multiCharacterMode={multiCharacterMode}
                   onViewResult={(data) => setPromptData(data)} 
                 />
               )}

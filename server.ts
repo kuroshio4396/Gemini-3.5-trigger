@@ -25,7 +25,7 @@ async function startServer() {
 
   app.post('/api/analyze', async (req, res) => {
     try {
-      const { image, mimeType, textInput, apiKey, model, filterR18, apiProvider } = req.body;
+      const { image, mimeType, textInput, apiKey, model, filterR18, multiCharacterMode, apiProvider } = req.body;
       if (!image && !textInput) {
         return res.status(400).json({ error: 'Missing image data or text input' });
       }
@@ -41,6 +41,10 @@ async function startServer() {
       
       if (filterR18) {
         promptText += "\n\nCRITICAL INSTRUCTION: You MUST filter out ANY and ALL explicit, NSFW, R18+, or overly sensitive vocabulary that might trigger safety content filters. Only output safe, stable prompt tags that will reliably pass safety checks while still describing the overall composition and non-explicit features of the image.";
+      }
+
+      if (multiCharacterMode) {
+        promptText += "\n\nCRITICAL INSTRUCTION (Multi-Character Mode): You MUST independently identify each character in the scene. For each character, you MUST generate a long, combined, and specific prompt tag that independently describes their individual features (clothing, hairstyle, appearance, etc.) in a single tag. For example, instead of separate words, use combined long tags like \"1girl, blonde hair, blue dress\" and \"1boy, black hair, suit\". Ensure these long combined tags are placed in the Character (人物) category.";
       }
 
       let base64Data = "";
