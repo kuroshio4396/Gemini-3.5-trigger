@@ -73,8 +73,13 @@ export function PromptResults({ data }: PromptResultsProps) {
           {tags.map((tag, idx) => (
             <div 
               key={`${category}-${idx}`}
-              className={`flex items-center gap-2 ${styles.bg} border ${styles.border} px-2 py-1 rounded`}
+              className={`flex items-center gap-2 ${styles.bg} border ${styles.border} px-2 py-1 rounded cursor-pointer hover:opacity-80 transition-opacity`}
+              onClick={() => copyToClipboard(tag.en, `${category}-${idx}`)}
+              title="点击复制该提示词"
             >
+              {copiedSection === `${category}-${idx}` ? (
+                <Check className={`w-3 h-3 ${styles.textEn}`} />
+              ) : null}
               <span className={`text-xs font-medium ${styles.textEn}`}>
                 {tag.en}
               </span>
