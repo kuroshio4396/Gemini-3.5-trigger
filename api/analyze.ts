@@ -1,5 +1,56 @@
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold, Type } from '@google/genai';
 
+// Moonshot/Kimi 开放平台支持的图片 MIME 类型（官方文档：jpeg/png/gif/webp/bmp/heic/heif，SVG 会被拒绝）
+const MOONSHOT_IMAGE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/bmp',
+  'image/heic',
+  'image/heif',
+]);
+
+// 读取上游错误响应：优先取 JSON 中的 error.message，非 JSON 时返回原始文本，
+// 避免把 "An error occurred while processing your request..." 这类纯文本错误直接丢给 JSON.parse。
+async function readUpstreamError(response: Response): Promise<string> {
+  const raw = await response.text().catch(() => '');
+  if (!raw.trim()) return response.statusText;
+  try {
+    const parsed = JSON.parse(raw);
+    const msg = parsed?.error?.message ?? parsed?.message ?? parsed?.error;
+    return typeof msg === 'string' && msg ? msg : raw.slice(0, 500);
+  } catch {
+    return raw.slice(0, 500);
+  }
+}
+
+// 安全解析响应 JSON：上游返回非 JSON 时给出可读错误而不是 V8 的 "Unexpected token ..."
+async function parseJsonBody(response: Response, label: string): Promise<any> {
+  const raw = await response.text();
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const snippet = raw.slice(0, 120);
+    throw new Error(`${label} 返回的内容不是合法 JSON，内容开头为：${JSON.stringify(snippet)}`);
+  }
+}
+
+// 安全解析模型输出：去除可能的 ```json 围栏后解析，失败时带上 finish_reason 与内容开头，便于排查
+function parseModelJson(text: string, finishReason?: string): any {
+  let cleaned = text.trim();
+  cleaned = cleaned.replace(/^```json\s*/i, '').replace(/\s*```$/, '');
+  cleaned = cleaned.replace(/^```\s*/, '').replace(/\s*```$/, '');
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const snippet = cleaned.slice(0, 120);
+    throw new Error(
+      `模型返回内容不是合法 JSON（finish_reason: ${finishReason || 'unknown'}）。返回内容开头为：${JSON.stringify(snippet)}`
+    );
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
@@ -34,7 +85,16 @@ export default async function handler(req, res) {
 
     let base64Data = "";
     if (image) {
-      base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+      // 注意：\w 匹配不了 "svg+xml" 这类带 "+" 的 MIME，会导致前缀剥不掉、生成双重前缀的畸形 data URL。
+      // 这里改用通用匹配：data:<任意类型>;base64,
+      base64Data = image.replace(/^data:[^;,]+;base64,/i, '');
+    }
+
+    if (base64Data && base64Data.length > 4_000_000) {
+      throw new Error(
+        `图片体积过大（base64 数据约 ${(base64Data.length / 1024 / 1024).toFixed(1)} MB）。` +
+        'Vercel 函数请求体上限为 4.5MB，请压缩图片（建议 4K 以内、文件小于 3MB）后重试。'
+      );
     }
 
     if (apiProvider === 'openrouter') {
@@ -92,54 +152,114 @@ export default async function handler(req, res) {
       if (!apiKey) {
         throw new Error('未配置 Kimi API Key。请在设置中配置您的 API Key。');
       }
+      if (image && !MOONSHOT_IMAGE_TYPES.has(mimeType)) {
+        throw new Error(
+          `Kimi 开放平台不支持图片格式 ${mimeType || '(未知)'}。支持的格式：JPEG、PNG、GIF、WebP、BMP、HEIC、HEIF（SVG 会被拒绝）。`
+        );
+      }
       const jsonInstruction = "\n\nIMPORTANT: You must return the output STRICTLY as a valid JSON object with keys: 'style', 'character', 'action', 'environment', 'composition'. Each key must be an array of objects with 'en' and 'zh' string keys. Do not include markdown formatting or backticks around the JSON. Remove any trailing commas.";
-      
-      const contentParts: any[] = [{ type: 'text', text: promptText + jsonInstruction }];
+
+      // 官方多模态示例中 image_url 位于 text 之前
+      const contentParts: any[] = [];
       if (image) {
         contentParts.push({ type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Data}` } });
       }
+      contentParts.push({ type: 'text', text: promptText + jsonInstruction });
 
-      const endpoint = apiProvider === 'kimi' 
-        ? 'https://api.kimi.com/coding/v1/chat/completions' 
+      const endpoint = apiProvider === 'kimi'
+        ? 'https://api.kimi.com/coding/v1/chat/completions'
         : 'https://api.moonshot.cn/v1/chat/completions';
 
-      const fetchResponse = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: [
-            {
-              role: 'user',
-              content: contentParts
-            }
-          ],
-          response_format: { type: 'json_object' }
-        })
-      });
+      // Vercel 函数 maxDuration 默认较短，流式传输可以保持连接活跃。这里将超时时间增加到 300 秒 (300_000ms)
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 300_000);
+      let fetchResponse: Response;
+      try {
+        fetchResponse = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: selectedModel,
+            stream: true, // 开启流式输出
+            messages: [
+              {
+                role: 'user',
+                content: contentParts
+              }
+            ],
+            response_format: { type: 'json_object' }
+          }),
+          signal: controller.signal,
+        });
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          throw new Error('Kimi API 请求超时（300 秒）。请重试或换用高速版模型。');
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeout);
+      }
 
       if (!fetchResponse.ok) {
-        const errData = await fetchResponse.json().catch(() => ({}));
-        throw new Error(`Kimi Error: ${errData.error?.message || fetchResponse.statusText}`);
+        const errMsg = await readUpstreamError(fetchResponse);
+        throw new Error(`Kimi API 错误 (${fetchResponse.status}): ${errMsg || fetchResponse.statusText}`);
       }
 
-      const data = await fetchResponse.json();
-      let text = data.choices?.[0]?.message?.content;
+      let text = '';
+      if (fetchResponse.body) {
+        const body = fetchResponse.body as any;
+        if (typeof body.getReader === 'function') {
+          const reader = body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            for (const line of lines) {
+              const trimmedLine = line.trim();
+              if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
+                try {
+                  const data = JSON.parse(trimmedLine.slice(6));
+                  if (data.choices?.[0]?.delta?.content) {
+                    text += data.choices[0].delta.content;
+                  }
+                } catch (e) {}
+              }
+            }
+          }
+        } else {
+          const decoder = new TextDecoder();
+          let buffer = '';
+          for await (const chunk of body) {
+            buffer += decoder.decode(chunk, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            for (const line of lines) {
+              const trimmedLine = line.trim();
+              if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
+                try {
+                  const data = JSON.parse(trimmedLine.slice(6));
+                  if (data.choices?.[0]?.delta?.content) {
+                    text += data.choices[0].delta.content;
+                  }
+                } catch (e) {}
+              }
+            }
+          }
+        }
+      }
+
       if (!text) {
-        throw new Error('No text generated from Kimi model');
+        throw new Error('Kimi 模型未返回任何文本内容');
       }
 
-      if (text.startsWith('```json')) {
-        text = text.replace(/^```json\n?/, '').replace(/\n?```$/, '');
-      }
-      if (text.startsWith('```')) {
-        text = text.replace(/^```\n?/, '').replace(/\n?```$/, '');
-      }
-
-      const tags = JSON.parse(text);
+      const tags = parseModelJson(text);
       return res.json(tags);
     }
 
@@ -271,7 +391,7 @@ export default async function handler(req, res) {
       throw new Error(`No text generated from model (Finish reason: ${finishReason || 'unknown'})`);
     }
 
-    const tags = JSON.parse(text);
+    const tags = parseModelJson(text, aiResponse.candidates?.[0]?.finishReason);
     return res.json(tags);
   } catch (error) {
     console.error('Error analyzing image:', error);

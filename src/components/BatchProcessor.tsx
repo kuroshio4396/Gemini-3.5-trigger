@@ -81,11 +81,18 @@ export function BatchProcessor({ settings, filterR18, multiCharacterMode, animaM
         });
 
         if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error || 'Failed to analyze image');
+          const raw = await response.text().catch(() => '');
+          let errData: any = {};
+          try { errData = raw ? JSON.parse(raw) : {}; } catch {}
+          if (response.status === 413) {
+            throw new Error('请求体超过 Vercel 函数 4.5MB 限制，请压缩图片（建议小于 3MB）后重试。');
+          }
+          throw new Error(errData.details || errData.error || raw || `请求失败（HTTP ${response.status}）`);
         }
 
-        const data: PromptData = await response.json();
+        const data: PromptData = await response.json().catch(() => {
+          throw new Error('服务器返回了无法解析的响应。如果图片较大，请压缩后重试（Vercel 函数请求体上限为 4.5MB）。');
+        });
         setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'success', result: data } : f));
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
