@@ -1,5 +1,7 @@
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold, Type } from '@google/genai';
 
+export const maxDuration = 300;
+
 // Moonshot/Kimi 开放平台支持的图片 MIME 类型（官方文档：jpeg/png/gif/webp/bmp/heic/heif，SVG 会被拒绝）
 const MOONSHOT_IMAGE_TYPES = new Set([
   'image/jpeg',
