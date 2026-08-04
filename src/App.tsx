@@ -15,6 +15,7 @@ export default function App() {
   const [textInput, setTextInput] = useState('');
 
   const [multiCharacterMode, setMultiCharacterMode] = useState(false);
+  const [animaMode, setAnimaMode] = useState(false);
 
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('promptrefine_settings');
@@ -51,7 +52,8 @@ export default function App() {
           apiKey: settings.apiKey,
           model: settings.model,
           filterR18,
-          multiCharacterMode
+          multiCharacterMode,
+          animaMode
         }),
       });
 
@@ -89,7 +91,8 @@ export default function App() {
           apiKey: settings.apiKey,
           model: settings.model,
           filterR18,
-          multiCharacterMode
+          multiCharacterMode,
+          animaMode
         }),
       });
 
@@ -132,6 +135,17 @@ export default function App() {
           >
             <span className="w-2 h-2 rounded-full bg-current"></span>
             多人内容识别 {multiCharacterMode ? '已开启' : '未开启'}
+          </button>
+          <button
+            onClick={() => setAnimaMode(!animaMode)}
+            className={`text-sm font-semibold px-4 py-1.5 rounded-lg shadow-sm transition-colors flex items-center gap-2 border ${
+              animaMode 
+                ? 'bg-purple-100 border-purple-200 text-purple-700 hover:bg-purple-200' 
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-current"></span>
+            Anima模式 {animaMode ? '已开启' : '未开启'}
           </button>
           <button
             onClick={() => setFilterR18(!filterR18)}
@@ -214,6 +228,7 @@ export default function App() {
                   settings={settings} 
                   filterR18={filterR18} 
                   multiCharacterMode={multiCharacterMode}
+                  animaMode={animaMode}
                   onViewResult={(data) => setPromptData(data)} 
                 />
               )}

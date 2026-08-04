@@ -43,12 +43,12 @@ export function SettingsModal({ isOpen, onClose, onSave, initialSettings }: Sett
             <select 
               value={apiProvider}
               onChange={(e) => {
-                const newProvider = e.target.value as 'google' | 'openrouter' | 'kimi';
+                const newProvider = e.target.value as 'google' | 'openrouter' | 'kimi' | 'moonshot';
                 setApiProvider(newProvider);
                 // Switch model if switching providers
-                if (newProvider === 'kimi') {
-                  setModel('kimi k2.7 code');
-                } else if (model === 'kimi k2.7 code' || model === 'kimi-2.6') {
+                if (newProvider === 'kimi' || newProvider === 'moonshot') {
+                  setModel('kimi-k2.7-code');
+                } else if (model === 'kimi-k2.7-code' || model === 'kimi k2.7 code' || model === 'kimi k2.6' || model === 'kimi-k2.6' || model === 'kimi-2.6') {
                   setModel('gemini-2.5-flash');
                 }
               }}
@@ -56,7 +56,8 @@ export function SettingsModal({ isOpen, onClose, onSave, initialSettings }: Sett
             >
               <option value="google">Google AI Studio</option>
               <option value="openrouter">OpenRouter</option>
-              <option value="kimi">Kimi API</option>
+              <option value="kimi">Kimi</option>
+              <option value="moonshot">Kimi开放平台</option>
             </select>
           </div>
 
@@ -68,7 +69,7 @@ export function SettingsModal({ isOpen, onClose, onSave, initialSettings }: Sett
               onChange={(e) => setApiKey(e.target.value)}
               placeholder={
                 apiProvider === 'openrouter' ? '请输入 OpenRouter API Key' : 
-                apiProvider === 'kimi' ? '请输入 Kimi API Key' : '留空则使用内置 AI 进行处理'
+                (apiProvider === 'kimi' || apiProvider === 'moonshot') ? '请输入 Kimi API Key' : '留空则使用内置 AI 进行处理'
               }
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
             />
@@ -81,8 +82,13 @@ export function SettingsModal({ isOpen, onClose, onSave, initialSettings }: Sett
               onChange={(e) => setModel(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
             >
-              {apiProvider === 'kimi' ? (
-                <option value="kimi k2.7 code">Kimi k2.7 Code</option>
+              {apiProvider === 'moonshot' ? (
+                <>
+                  <option value="kimi-k2.7-code">Kimi K2.7 Code</option>
+                  <option value="kimi-k2.6">Kimi K2.6</option>
+                </>
+              ) : apiProvider === 'kimi' ? (
+                <option value="kimi-k2.7-code">Kimi K2.7 Code</option>
               ) : (
                 <>
                   <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
@@ -109,7 +115,7 @@ export function SettingsModal({ isOpen, onClose, onSave, initialSettings }: Sett
           </button>
           <button 
             onClick={() => {
-              onSave({ apiProvider: apiProvider as 'google' | 'openrouter' | 'kimi', apiKey, model });
+              onSave({ apiProvider: apiProvider as 'google' | 'openrouter' | 'kimi' | 'moonshot', apiKey, model });
               onClose();
             }}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center gap-2"

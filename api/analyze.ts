@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { image, mimeType, textInput, apiKey, model, filterR18, multiCharacterMode, apiProvider } = req.body;
+    const { image, mimeType, textInput, apiKey, model, filterR18, multiCharacterMode, animaMode, apiProvider } = req.body;
     if (!image && !textInput) {
       return res.status(400).json({ error: 'Missing image data or text input' });
     }
@@ -26,6 +26,10 @@ export default async function handler(req, res) {
 
     if (multiCharacterMode) {
       promptText += "\n\nCRITICAL INSTRUCTION (Multi-Character Mode): You MUST independently identify each character in the scene. For each character, you MUST generate a long, combined, and specific prompt tag that independently describes their individual features (clothing, hairstyle, appearance, etc.) in a single tag. For example, instead of separate words, use combined long tags like \"1girl, blonde hair, blue dress\" and \"1boy, black hair, suit\". Ensure these long combined tags are placed in the Character (人物) category.";
+    }
+
+    if (animaMode) {
+      promptText += "\n\nCRITICAL INSTRUCTION (Anima Mode): Instead of outputting isolated, standalone tags (like '1girl', 'blue sky'), you MUST use natural language, highly descriptive, and precise long sentences. Construct flowing, continuous descriptions that intricately detail the subject, action, lighting, and mood (e.g., 'A beautiful young woman standing under a clear blue sky, her blonde hair blowing gently in the wind, wearing a detailed flowing blue dress...'). Ensure all resulting prompts in every category are formatted as cohesive natural language phrases or sentences rather than comma-separated keywords.";
     }
 
     let base64Data = "";
@@ -84,7 +88,7 @@ export default async function handler(req, res) {
       return res.json(tags);
     }
 
-    if (apiProvider === 'kimi') {
+    if (apiProvider === 'kimi' || apiProvider === 'moonshot') {
       if (!apiKey) {
         throw new Error('未配置 Kimi API Key。请在设置中配置您的 API Key。');
       }
@@ -95,7 +99,11 @@ export default async function handler(req, res) {
         contentParts.push({ type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Data}` } });
       }
 
-      const fetchResponse = await fetch('https://api.kimi.com/coding/v1/chat/completions', {
+      const endpoint = apiProvider === 'kimi' 
+        ? 'https://api.kimi.com/coding/v1/chat/completions' 
+        : 'https://api.moonshot.cn/v1/chat/completions';
+
+      const fetchResponse = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,

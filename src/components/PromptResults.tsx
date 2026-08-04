@@ -17,6 +17,7 @@ const categoryStyles: Record<Category, { dot: string, bg: string, border: string
 
 export function PromptResults({ data }: PromptResultsProps) {
   const [copiedSection, setCopiedSection] = React.useState<string | null>(null);
+  const [copyLanguage, setCopyLanguage] = React.useState<'en' | 'zh'>('en');
 
   const copyToClipboard = async (text: string, section: string) => {
     try {
@@ -28,11 +29,11 @@ export function PromptResults({ data }: PromptResultsProps) {
     }
   };
 
-  const allEnglishPrompts = useMemo(() => {
+  const allPrompts = useMemo(() => {
     if (!data) return '';
-    const allEn = Object.values(data).flatMap(tags => tags.map(t => t.en));
-    return allEn.join(', ');
-  }, [data]);
+    const all = Object.values(data).flatMap(tags => tags.map(t => copyLanguage === 'en' ? t.en : t.zh));
+    return all.join(', ');
+  }, [data, copyLanguage]);
 
   if (!data) {
     return (
@@ -49,6 +50,8 @@ export function PromptResults({ data }: PromptResultsProps) {
     if (!tags || tags.length === 0) return null;
 
     const enTagsStr = tags.map(t => t.en).join(', ');
+    const zhTagsStr = tags.map(t => t.zh).join(', ');
+    const tagsStr = copyLanguage === 'en' ? enTagsStr : zhTagsStr;
 
     return (
       <div key={category} className={`bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-col ${styles.colSpan || ''} overflow-hidden`}>
@@ -57,16 +60,32 @@ export function PromptResults({ data }: PromptResultsProps) {
             <div className={`w-2 h-2 rounded-full ${styles.dot}`}></div>
             <h4 className="text-xs font-bold text-slate-700 uppercase">{styles.titleZh} | {styles.titleEn}</h4>
           </div>
-          <button
-            onClick={() => copyToClipboard(enTagsStr, category)}
-            className="flex items-center gap-1 text-[10px] font-bold uppercase text-slate-400 hover:text-indigo-600 transition-colors"
-          >
-            {copiedSection === category ? (
-              <><Check className="w-3 h-3 text-green-500" /> Copied</>
-            ) : (
-              <><Copy className="w-3 h-3" /> Copy</>
-            )}
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center bg-slate-100 rounded p-0.5">
+              <button 
+                onClick={() => setCopyLanguage('en')} 
+                className={`px-2 py-0.5 text-[9px] font-bold rounded ${copyLanguage === 'en' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                EN
+              </button>
+              <button 
+                onClick={() => setCopyLanguage('zh')} 
+                className={`px-2 py-0.5 text-[9px] font-bold rounded ${copyLanguage === 'zh' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                中文
+              </button>
+            </div>
+            <button
+              onClick={() => copyToClipboard(tagsStr, category)}
+              className="flex items-center gap-1 text-[10px] font-bold uppercase text-slate-400 hover:text-indigo-600 transition-colors"
+            >
+              {copiedSection === category ? (
+                <><Check className="w-3 h-3 text-green-500" /> Copied</>
+              ) : (
+                <><Copy className="w-3 h-3" /> Copy</>
+              )}
+            </button>
+          </div>
         </div>
         
         <div className="flex flex-wrap gap-2 overflow-y-auto pr-1 custom-scrollbar">
@@ -74,8 +93,8 @@ export function PromptResults({ data }: PromptResultsProps) {
             <div 
               key={`${category}-${idx}`}
               className={`flex items-center gap-2 ${styles.bg} border ${styles.border} px-2 py-1 rounded cursor-pointer hover:opacity-80 transition-opacity`}
-              onClick={() => copyToClipboard(tag.en, `${category}-${idx}`)}
-              title="点击复制该提示词"
+              onClick={() => copyToClipboard(copyLanguage === 'en' ? tag.en : tag.zh, `${category}-${idx}`)}
+              title={`点击复制该提示词 (${copyLanguage === 'en' ? '英文' : '中文'})`}
             >
               {copiedSection === `${category}-${idx}` ? (
                 <Check className={`w-3 h-3 ${styles.textEn}`} />
@@ -107,16 +126,32 @@ export function PromptResults({ data }: PromptResultsProps) {
 
       <div className="h-14 bg-white border border-slate-200 rounded-xl px-4 flex items-center justify-between shrink-0 shadow-sm">
         <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">Export Options</span>
-        <button
-          onClick={() => copyToClipboard(allEnglishPrompts, 'all')}
-          className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-bold shadow-sm flex items-center gap-2 transition-colors"
-        >
-          {copiedSection === 'all' ? (
-            <><Check className="w-4 h-4" /> Copied Workflow Prompts</>
-          ) : (
-            <><Copy className="w-4 h-4" /> Export to ComfyUI Workflow</>
-          )}
-        </button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center bg-slate-100 rounded p-0.5">
+            <button 
+              onClick={() => setCopyLanguage('en')} 
+              className={`px-3 py-1 text-[10px] font-bold rounded ${copyLanguage === 'en' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              EN
+            </button>
+            <button 
+              onClick={() => setCopyLanguage('zh')} 
+              className={`px-3 py-1 text-[10px] font-bold rounded ${copyLanguage === 'zh' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              中文
+            </button>
+          </div>
+          <button
+            onClick={() => copyToClipboard(allPrompts, 'all')}
+            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-bold shadow-sm flex items-center gap-2 transition-colors"
+          >
+            {copiedSection === 'all' ? (
+              <><Check className="w-4 h-4" /> Copied Workflow Prompts</>
+            ) : (
+              <><Copy className="w-4 h-4" /> Export to ComfyUI Workflow</>
+            )}
+          </button>
+        </div>
       </div>
     </motion.div>
   );
