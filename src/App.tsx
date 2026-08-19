@@ -14,6 +14,7 @@ export default function App() {
   const [inputType, setInputType] = useState<'image' | 'text' | 'batch'>('image');
   const [textInput, setTextInput] = useState('');
 
+  const [additionalPrompt, setAdditionalPrompt] = useState('');
   const [multiCharacterMode, setMultiCharacterMode] = useState(false);
   const [animaMode, setAnimaMode] = useState(false);
 
@@ -53,7 +54,8 @@ export default function App() {
           model: settings.model,
           filterR18,
           multiCharacterMode,
-          animaMode
+          animaMode,
+          additionalPrompt
         }),
       });
 
@@ -99,7 +101,8 @@ export default function App() {
           model: settings.model,
           filterR18,
           multiCharacterMode,
-          animaMode
+          animaMode,
+          additionalPrompt
         }),
       });
 
@@ -240,12 +243,25 @@ export default function App() {
                   filterR18={filterR18} 
                   multiCharacterMode={multiCharacterMode}
                   animaMode={animaMode}
+                  additionalPrompt={additionalPrompt}
                   onViewResult={(data) => setPromptData(data)} 
                 />
               )}
             </div>
           </div>
           
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0 flex flex-col gap-2">
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+              附加提示词指导 (可选)
+            </label>
+            <textarea
+              value={additionalPrompt}
+              onChange={(e) => setAdditionalPrompt(e.target.value)}
+              placeholder="例如：请侧重描述人物服饰，或将其风格转为赛博朋克..."
+              className="w-full resize-none p-3 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 h-24"
+            />
+          </div>
+
           {error && (
             <div className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm font-medium shadow-sm">
               发生错误: {error}

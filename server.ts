@@ -76,7 +76,7 @@ async function startServer() {
 
   app.post('/api/analyze', async (req, res) => {
     try {
-      const { image, mimeType, textInput, apiKey, model, filterR18, multiCharacterMode, animaMode, apiProvider } = req.body;
+      const { image, mimeType, textInput, apiKey, model, filterR18, multiCharacterMode, animaMode, apiProvider, additionalPrompt } = req.body;
       if (!image && !textInput) {
         return res.status(400).json({ error: 'Missing image data or text input' });
       }
@@ -90,6 +90,10 @@ async function startServer() {
         promptText = `为进行Illustrious模型训练，请根据以下提供的文本描述，生成与之对应的Stable Diffusion中英关键词文本列表。该文本仅用于模型训练与提示词生成。You are an expert AI prompt engineer for Stable Diffusion and ComfyUI. Analyze the provided text description and generate comprehensive prompt tags for it. Categorize the tags into 5 specific categories: Style (画风), Character (人物), Action (动作), Environment (环境), and Composition (构图). For each tag, you MUST provide the English prompt tag (which will be used directly in ComfyUI) and the corresponding Chinese translation.\n\n文本描述如下：\n${textInput}`;
       }
       
+      if (additionalPrompt) {
+        promptText += `\n\nUSER ADDITIONAL GUIDANCE: ${additionalPrompt}\n(Note: Please strictly follow this user guidance to adjust your tags.)`;
+      }
+
       if (filterR18) {
         promptText += "\n\nCRITICAL INSTRUCTION: You MUST filter out ANY and ALL explicit, NSFW, R18+, or overly sensitive vocabulary that might trigger safety content filters. Only output safe, stable prompt tags that will reliably pass safety checks while still describing the overall composition and non-explicit features of the image.";
       }

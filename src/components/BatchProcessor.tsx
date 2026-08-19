@@ -17,10 +17,11 @@ interface BatchProcessorProps {
   filterR18: boolean;
   multiCharacterMode: boolean;
   animaMode: boolean;
+  additionalPrompt?: string;
   onViewResult: (data: PromptData | null) => void;
 }
 
-export function BatchProcessor({ settings, filterR18, multiCharacterMode, animaMode, onViewResult }: BatchProcessorProps) {
+export function BatchProcessor({ settings, filterR18, multiCharacterMode, animaMode, additionalPrompt, onViewResult }: BatchProcessorProps) {
   const [files, setFiles] = useState<BatchFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -76,7 +77,8 @@ export function BatchProcessor({ settings, filterR18, multiCharacterMode, animaM
             model: settings.model,
             filterR18,
             multiCharacterMode,
-            animaMode
+            animaMode,
+            additionalPrompt
           }),
         });
 
