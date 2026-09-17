@@ -119,11 +119,9 @@
 
 左栏 `INPUT SOURCE` 的三个页签切换：
 
-| 页签 | 输入 | 说明 |
-|---|---|---|
-| **图片** | 拖拽或点击上传单张图 | 上传即自动开始分析，无二次确认。`accept="image/*"`，前端不设体积限制（后端有限制，见 [API 说明](#api-说明)）。分析时图片上覆盖「Analyzing Image...」遮罩，完成后可点 `Replace Reference Image` 换图 |
-| **文本** | 多行文本描述 | 走同一个 `/api/analyze`，只是不带 `image` 而带 `textInput`。适合「先有构想、要提示词」的场景。描述为空时按钮禁用 |
-| **批量** | 多选图片 | 见 [配套工具](#配套工具) 与下方说明 |
+- **图片** —— 拖拽或点击上传单张图。上传即自动开始分析，无二次确认。`accept="image/*"`，前端不设体积限制（后端有限制，见 [API 说明](#api-说明)）。分析时图片上覆盖「Analyzing Image...」遮罩，完成后可点 `Replace Reference Image` 换图
+- **文本** —— 多行文本描述。走同一个 `/api/analyze`，只是不带 `image` 而带 `textInput`。适合「先有构想、要提示词」的场景。描述为空时按钮禁用
+- **批量** —— 多选图片。见下方「批量模式的行为细节」
 
 **批量模式的行为细节**（值得先知道，能省很多时间）：
 
@@ -181,13 +179,15 @@
 
 模型输出被强制约束为五个固定键，每项是 `{en, zh}` 数组：
 
-| 键 | 界面标题 | 覆盖内容（取自 Gemini `responseSchema` 的官方描述） | 色卡 |
-|---|---|---|---|
-| `style` | 画风提示词 / Art Style | 艺术风格、媒介、渲染方式、光照与视觉美学 | 蓝 |
-| `character` | 人物提示词 / Character | 人物、主体、服装、发型、表情与身体特征 | 绿 |
-| `action` | 动作提示词 / Action | 动作、姿势、互动与动态 | 琥珀 |
-| `environment` | 环境提示词 / Environment | 背景、场景、风景、道具与地点 | 紫 |
-| `composition` | 构图提示词 / Composition | 机位、取景、焦点、透视与画面布局 | 玫瑰 |
+| 键 | 界面标题 | 覆盖内容（取自 Gemini `responseSchema` 的官方描述） |
+|---|---|---|
+| `style` | 画风提示词 / Art Style | 艺术风格、媒介、渲染方式、光照与视觉美学 |
+| `character` | 人物提示词 / Character | 人物、主体、服装、发型、表情与身体特征 |
+| `action` | 动作提示词 / Action | 动作、姿势、互动与动态 |
+| `environment` | 环境提示词 / Environment | 背景、场景、风景、道具与地点 |
+| `composition` | 构图提示词 / Composition | 机位、取景、焦点、透视与画面布局 |
+
+结果区的色卡：**画风**=蓝、**人物**=绿、**动作**=琥珀、**环境**=紫、**构图**=玫瑰（`构图` 那一格在 2×3 网格里横跨两列）。
 
 **响应结构**：
 
@@ -220,13 +220,11 @@
 
 ### 三条通道的实现差异（读代码才看得出来）
 
-| | Google | OpenRouter | Kimi / Moonshot |
-|---|---|---|---|
-| **结构化约束** | 原生 `responseSchema`（`Type.OBJECT` + 五键 `required`）+ `responseMimeType: 'application/json'` | 只靠提示词里的 `jsonInstruction` + `response_format: { type: 'json_object' }` | 同左 |
-| **安全设置** | 显式传入 4 条 `safetySettings`，全部 `BLOCK_NONE` | 不传，由 OpenRouter / Google 侧策略决定 | 不传，由 Kimi 侧策略决定 |
-| **模型名处理** | 原样透传 | **强制加 `google/` 前缀** | 原样透传 |
-| **传输方式** | SDK 一次性返回 | 一次性返回 | **`stream: true` 流式**，服务端逐块拼 `delta.content` |
-| **超时** | 未显式设置 | 未显式设置 | 300 秒（`AbortController`） |
+- **结构化约束** —— 只有 **Google** 走原生 `responseSchema`（`Type.OBJECT` + 五键 `required`），配合 `responseMimeType: 'application/json'`；**OpenRouter 与 Kimi** 拿不到这个能力，只能靠提示词里的 `jsonInstruction` 加 `response_format: { type: 'json_object' }` 来约束。
+- **安全设置** —— 只有 **Google** 显式传入 4 条 `safetySettings`（全部 `BLOCK_NONE`）；**OpenRouter** 不传，由 OpenRouter / Google 侧策略决定；**Kimi / Moonshot** 也不传，由 Kimi 侧策略决定。
+- **模型名处理** —— 只有 **OpenRouter** 会**强制加 `google/` 前缀**，**Google 与 Kimi** 都是原样透传。
+- **传输方式** —— 只有 **Kimi / Moonshot** 走 `stream: true` 流式（服务端逐块拼 `delta.content`），**Google 与 OpenRouter** 都是一次性返回。
+- **超时** —— 只有 **Kimi / Moonshot** 显式设置 300 秒 `AbortController` 超时，与 `vercel.json` 里的 `maxDuration: 300` 配套；另两家未显式设置。
 
 三点值得单独说明：
 
@@ -295,10 +293,10 @@ npm run dev
 
 `.env.example` 里有两个：
 
-| 变量 | 必填 | 说明 |
-|---|---|---|
-| `GEMINI_API_KEY` | 否 | 服务端兜底 Key。**仅在「服务商 = Google AI Studio 且用户在界面里没填 Key」时才会被使用**。想让部署实例开箱即用就配它 |
-| `APP_URL` | 否 | 应用自身 URL。目前只被 OpenRouter 分支用作 `HTTP-Referer` 头，默认 `http://localhost:3000` |
+| 变量 | 说明 |
+|---|---|
+| `GEMINI_API_KEY` | **可选（但建议配）**。服务端兜底 Key，**仅在「服务商 = Google AI Studio 且用户在界面里没填 Key」时才会被使用**。想让部署实例开箱即用就配它 |
+| `APP_URL` | **可选**。应用自身 URL，目前只被 OpenRouter 分支用作 `HTTP-Referer` 头，默认 `http://localhost:3000` |
 
 > **Key 的优先级**：请求体里的 `apiKey`（界面填的）**优先于** `process.env.GEMINI_API_KEY`。两者都为空时，接口返回 500 并提示「未配置 API Key」。
 
@@ -351,18 +349,18 @@ NODE_ENV=production npm start
 
 ### 请求体
 
-| 字段 | 类型 | 必填 | 默认 | 说明 |
-|---|---|---|---|---|
-| `image` | `string` | 二选一 | — | 完整 data URL，形如 `data:image/png;base64,...`。服务端会剥掉前缀取 base64 |
-| `textInput` | `string` | 二选一 | — | 纯文本描述。与 `image` 二选一，两者都缺返回 400 |
-| `mimeType` | `string` | 传图时建议 | — | 图片 MIME。Kimi 通道会用它做白名单校验 |
-| `apiProvider` | `string` | 否 | `google` | `google` / `openrouter` / `kimi` / `moonshot` |
-| `apiKey` | `string` | 否 | `''` | 空则回落到服务端 `GEMINI_API_KEY`（仅 Google 通道） |
-| `model` | `string` | 否 | `gemini-2.5-flash` | 模型名 |
-| `filterR18` | `boolean` | 否 | `false` | 追加 R18 过滤指令 |
-| `multiCharacterMode` | `boolean` | 否 | `false` | 追加多人识别指令 |
-| `animaMode` | `boolean` | 否 | `false` | 追加自然语言长句指令 |
-| `additionalPrompt` | `string` | 否 | — | 用户附加指导，追加为 `USER ADDITIONAL GUIDANCE` |
+| 字段 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `image` | `string` | — | 完整 data URL，形如 `data:image/png;base64,...`。服务端会剥掉前缀取 base64。与 `textInput` **二选一** |
+| `textInput` | `string` | — | 纯文本描述。与 `image` **二选一**，两者都缺返回 400 |
+| `mimeType` | `string` | — | 图片 MIME。Kimi 通道会用它做白名单校验。**传图时建议提供** |
+| `apiProvider` | `string` | `google` | `google` / `openrouter` / `kimi` / `moonshot` |
+| `apiKey` | `string` | `''` | 空则回落到服务端 `GEMINI_API_KEY`（仅 Google 通道） |
+| `model` | `string` | `gemini-2.5-flash` | 模型名 |
+| `filterR18` | `boolean` | `false` | 追加 R18 过滤指令 |
+| `multiCharacterMode` | `boolean` | `false` | 追加多人识别指令 |
+| `animaMode` | `boolean` | `false` | 追加自然语言长句指令 |
+| `additionalPrompt` | `string` | — | 用户附加指导，追加为 `USER ADDITIONAL GUIDANCE` |
 
 ### 成功响应
 
@@ -385,20 +383,18 @@ HTTP `200`，直接就是五键对象（**没有外层包装**）：
 ```json
 { "error": "Failed to analyze image", "details": "<可读的中文/英文原因>" }
 ```
-
-| 状态码 | `details` 关键内容 | 触发条件 |
-|---|---|---|
-| `400` | `Missing image data or text input` | `image` 与 `textInput` 都为空 |
-| `405` | `Method Not Allowed` | 用了非 POST 方法 |
-| `413` | 前端会转成「请求体超过 Vercel 函数 4.5MB 限制…」 | 请求体超出平台上限（**这颗由平台拦，不进函数逻辑**） |
-| `500` | `未配置 API Key。请在设置中配置您的 API Key…` | 界面 Key 与服务端 `GEMINI_API_KEY` 都为空 |
-| `500` | `未配置 OpenRouter API Key…` / `未配置 Kimi API Key…` | 选了对应服务商但 Key 为空 |
-| `500` | `图片体积过大（base64 数据约 X MB）。Vercel 函数请求体上限为 4.5MB…` | base64 长度 > 4,000,000（**这道是函数内预检，先于调用上游**） |
-| `500` | `Kimi 开放平台不支持图片格式 image/svg+xml…` | Kimi 通道遇到白名单外的 MIME |
-| `500` | `Kimi API 请求超时（300 秒）。请重试或换用高速版模型。` | Kimi 通道 300 秒未返回 |
-| `500` | `模型返回内容不是合法 JSON（finish_reason: …）` | 模型没按契约吐 JSON（含被截断） |
-| `500` | `Image analysis blocked by safety filters. Please try another image.` | Gemini 侧 `finishReason === 'SAFETY'`，返回体为空 |
-| `500` | `OpenRouter Error: …` / `Kimi API 错误 (4xx): …` | 上游报错，原文透传 |
+各状态码与 `details` 的对应关系：
+- **`400`** —— **`image` 与 `textInput` 都为空** → `Missing image data or text input`
+- **`405`** —— 用了非 POST 方法 → `Method Not Allowed`
+- **`413`** —— 请求体超出平台上限。**这颗由平台拦，不进函数逻辑**；前端会转成「请求体超过 Vercel 函数 4.5MB 限制…」
+- **`500`** —— 界面 Key 与服务端 `GEMINI_API_KEY` 都为空 → `未配置 API Key。请在设置中配置您的 API Key…`
+- **`500`** —— 选了 OpenRouter / Kimi 但 Key 为空 → `未配置 OpenRouter API Key…` / `未配置 Kimi API Key…`
+- **`500`** —— base64 长度 > 4,000,000 → `图片体积过大（base64 数据约 X MB）。Vercel 函数请求体上限为 4.5MB…`。**这道是函数内预检，先于调用上游**
+- **`500`** —— Kimi 通道遇到白名单外的 MIME → `Kimi 开放平台不支持图片格式 image/svg+xml…`
+- **`500`** —— Kimi 通道 300 秒未返回 → `Kimi API 请求超时（300 秒）。请重试或换用高速版模型。`
+- **`500`** —— 模型没按契约吐 JSON（含被截断） → `模型返回内容不是合法 JSON（finish_reason: …）`
+- **`500`** —— Gemini 侧 `finishReason === 'SAFETY'`，返回体为空 → `Image analysis blocked by safety filters. Please try another image.`
+- **`500`** —— 上游报错，原文透传 → `OpenRouter Error: …` / `Kimi API 错误 (4xx): …`
 
 ### 调用示例
 
@@ -497,15 +493,13 @@ Gemini-3.5-trigger/
 
 **这个工具会把你的图片送到第三方模型服务商。** 使用前请明确以下几点：
 
-| 项目 | 实际情况 |
-|---|---|
-| **图片去向** | 以 base64 内联进请求体，**经你部署的服务端转发**给 Gemini / OpenRouter / Kimi 上游。服务端本身**不落盘、不写日志文件**（只在出错时 `console.error` 到函数日志） |
-| **API Key 存放** | 存在浏览器 `localStorage` 的 `promptrefine_settings` 键下，**明文**。同浏览器同域名的任何脚本都能读到 |
-| **Key 传输** | 每次请求都会把 Key 放进请求体发给服务端。**服务端不存储**，但会出现在平台日志可捕获的范围内（当前代码未打印请求体，但这是需要留意的边界） |
-| **服务端日志** | 出错路径会 `console.error('Error analyzing image:', error)` —— 在 Vercel 上会进 Functions 日志 |
-| **账号体系** | 无。没有用户、没有数据库、没有统计上报 |
-| **前端持久化** | 只有 `promptrefine_settings` 一项。反推结果**不保存**，刷新即丢 |
-| **同步到服务器** | 无 |
+- **图片去向** —— 以 base64 内联进请求体，**经你部署的服务端转发**给 Gemini / OpenRouter / Kimi 上游。服务端本身**不落盘、不写日志文件**（只在出错时 `console.error` 到函数日志）
+- **API Key 存放** —— 存在浏览器 `localStorage` 的 `promptrefine_settings` 键下，**明文**。同浏览器同域名的任何脚本都能读到
+- **Key 传输** —— 每次请求都会把 Key 放进请求体发给服务端。**服务端不存储**，但会出现在平台日志可捕获的范围内（当前代码未打印请求体，但这是需要留意的边界）
+- **服务端日志** —— 出错路径会 `console.error('Error analyzing image:', error)`，在 Vercel 上会进 Functions 日志
+- **账号体系** —— 无。没有用户、没有数据库、没有统计上报
+- **前端持久化** —— 只有 `promptrefine_settings` 一项。反推结果**不保存**，刷新即丢
+- **同步到服务器** —— 无
 
 **共用部署实例的注意事项**：如果多人使用同一个部署，且部署方配置了服务端 `GEMINI_API_KEY`，那么所有人都在消耗**同一个**额度。
 
@@ -532,9 +526,9 @@ Gemini-3.5-trigger/
 
 这个仓库是「提示词流水线」里的**生成端**，和作者另一个仓库构成完整链路：
 
-| 工具 | 职责 | 仓库 |
+| 工具 | 职责 | GitHub |
 |---|---|---|
-| **Gemini-3.5-trigger**（本仓库） | 反推 —— 图/文 → 五分类中英标签 | 你在这里 |
+| **Gemini-3.5-trigger**（本仓库） | 反推 —— 图/文 → 五分类中英标签 | <https://github.com/kuroshio4396/Gemini-3.5-trigger> |
 | **ComfyUI 提示词归档助手** | 归档 —— 五分类标签 → 浏览器 IndexedDB，带预览图与 Excel 导入导出 | <https://github.com/kuroshio4396/ComfyUI-> |
 
 两边产出的数据结构**完全一致**（都是 `style / character / action / environment / composition` 五个键、每项 `{en, zh}`），所以可以「本仓库反推 → 手动搬进归档库」，无需格式转换。
