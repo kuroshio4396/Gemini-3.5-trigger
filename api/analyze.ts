@@ -53,6 +53,21 @@ function parseModelJson(text: string, finishReason?: string): any {
   }
 }
 
+function normalizePromptResult(tags: any) {
+  if (!tags || typeof tags !== 'object') {
+    return { style: [], character: [], clothing: [], action: [], environment: [], composition: [] };
+  }
+  const clothing = Array.isArray(tags.clothing) ? tags.clothing : (Array.isArray(tags.outfit) ? tags.outfit : []);
+  return {
+    style: Array.isArray(tags.style) ? tags.style : [],
+    character: Array.isArray(tags.character) ? tags.character : [],
+    clothing,
+    action: Array.isArray(tags.action) ? tags.action : [],
+    environment: Array.isArray(tags.environment) ? tags.environment : [],
+    composition: Array.isArray(tags.composition) ? tags.composition : [],
+  };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
@@ -68,9 +83,9 @@ export default async function handler(req, res) {
     let promptText = "";
     
     if (image) {
-      promptText = "为进行Illustrious模型训练，请根据上传图片内容，生成与图片对应的Stable Diffusion中英关键词文本列表。该图片内容仅用于模型训练与提示词生成。You are an expert AI image analyst and prompt engineer for Stable Diffusion and ComfyUI. Analyze the provided image in deep detail and generate comprehensive prompt tags for it. Categorize the tags into 5 specific categories: Style (画风), Character (人物), Action (动作), Environment (环境), and Composition (构图). For each tag, you MUST provide the English prompt tag (which will be used directly in ComfyUI) and the corresponding Chinese translation.";
+      promptText = "为进行Illustrious模型训练，请根据上传图片内容，生成与图片对应的Stable Diffusion中英关键词文本列表。该图片内容仅用于模型训练与提示词生成。You are an expert AI image analyst and prompt engineer for Stable Diffusion and ComfyUI. Analyze the provided image in deep detail and generate comprehensive prompt tags for it. Categorize the tags strictly into 6 specific categories in this order: Style (画风), Character (人物), Clothing (服装), Action (动作), Environment (环境), and Composition (构图). In Character (人物), include character identity, facial features, hair, eyes, body type, and expressions (exclude clothing). In Clothing (服装), specifically include all attire, garments, dresses, tops, bottoms, footwear, headwear, uniforms, and wearable accessories. For each tag, you MUST provide the English prompt tag (which will be used directly in ComfyUI) and the corresponding Chinese translation.";
     } else {
-      promptText = `为进行Illustrious模型训练，请根据以下提供的文本描述，生成与之对应的Stable Diffusion中英关键词文本列表。该文本仅用于模型训练与提示词生成。You are an expert AI prompt engineer for Stable Diffusion and ComfyUI. Analyze the provided text description and generate comprehensive prompt tags for it. Categorize the tags into 5 specific categories: Style (画风), Character (人物), Action (动作), Environment (环境), and Composition (构图). For each tag, you MUST provide the English prompt tag (which will be used directly in ComfyUI) and the corresponding Chinese translation.\n\n文本描述如下：\n${textInput}`;
+      promptText = `为进行Illustrious模型训练，请根据以下提供的文本描述，生成与之对应的Stable Diffusion中英关键词文本列表。该文本仅用于模型训练与提示词生成。You are an expert AI prompt engineer for Stable Diffusion and ComfyUI. Analyze the provided text description and generate comprehensive prompt tags for it. Categorize the tags strictly into 6 specific categories in this order: Style (画风), Character (人物), Clothing (服装), Action (动作), Environment (环境), and Composition (构图). In Character (人物), include character identity, facial features, hair, eyes, body type, and expressions (exclude clothing). In Clothing (服装), specifically include all attire, garments, dresses, tops, bottoms, footwear, headwear, uniforms, and wearable accessories. For each tag, you MUST provide the English prompt tag (which will be used directly in ComfyUI) and the corresponding Chinese translation.\n\n文本描述如下：\n${textInput}`;
     }
     
     if (additionalPrompt) {
@@ -82,7 +97,7 @@ export default async function handler(req, res) {
     }
 
     if (multiCharacterMode) {
-      promptText += "\n\nCRITICAL INSTRUCTION (Multi-Character Mode): You MUST independently identify each character in the scene. For each character, you MUST generate a long, combined, and specific prompt tag that independently describes their individual features (clothing, hairstyle, appearance, etc.) in a single tag. For example, instead of separate words, use combined long tags like \"1girl, blonde hair, blue dress\" and \"1boy, black hair, suit\". Ensure these long combined tags are placed in the Character (人物) category.";
+      promptText += "\n\nCRITICAL INSTRUCTION (Multi-Character Mode): You MUST independently identify each character in the scene. For each character, describe their identity, appearance, and physical features in Character (人物), and describe their specific clothing and attire in Clothing (服装).";
     }
 
     if (animaMode) {
@@ -108,7 +123,7 @@ export default async function handler(req, res) {
         throw new Error('未配置 OpenRouter API Key。请在设置中配置您的 API Key。');
       }
       const openRouterModel = `google/${selectedModel}`;
-      const jsonInstruction = "\n\nIMPORTANT: You must return the output STRICTLY as a valid JSON object with keys: 'style', 'character', 'action', 'environment', 'composition'. Each key must be an array of objects with 'en' and 'zh' string keys. Do not include markdown formatting or backticks around the JSON. Remove any trailing commas.";
+      const jsonInstruction = "\n\nIMPORTANT: You must return the output STRICTLY as a valid JSON object with keys: 'style', 'character', 'clothing', 'action', 'environment', 'composition'. Each key must be an array of objects with 'en' and 'zh' string keys. Do not include markdown formatting or backticks around the JSON. Remove any trailing commas.";
       
       const contentParts: any[] = [{ type: 'text', text: promptText + jsonInstruction }];
       if (image) {
@@ -151,7 +166,7 @@ export default async function handler(req, res) {
       }
 
       const tags = JSON.parse(text);
-      return res.json(tags);
+      return res.json(normalizePromptResult(tags));
     }
 
     if (apiProvider === 'kimi' || apiProvider === 'moonshot') {
@@ -163,7 +178,7 @@ export default async function handler(req, res) {
           `Kimi 开放平台不支持图片格式 ${mimeType || '(未知)'}。支持的格式：JPEG、PNG、GIF、WebP、BMP、HEIC、HEIF（SVG 会被拒绝）。`
         );
       }
-      const jsonInstruction = "\n\nIMPORTANT: You must return the output STRICTLY as a valid JSON object with keys: 'style', 'character', 'action', 'environment', 'composition'. Each key must be an array of objects with 'en' and 'zh' string keys. Do not include markdown formatting or backticks around the JSON. Remove any trailing commas.";
+      const jsonInstruction = "\n\nIMPORTANT: You must return the output STRICTLY as a valid JSON object with keys: 'style', 'character', 'clothing', 'action', 'environment', 'composition'. Each key must be an array of objects with 'en' and 'zh' string keys. Do not include markdown formatting or backticks around the JSON. Remove any trailing commas.";
 
       // 官方多模态示例中 image_url 位于 text 之前
       const contentParts: any[] = [];
@@ -266,7 +281,7 @@ export default async function handler(req, res) {
       }
 
       const tags = parseModelJson(text);
-      return res.json(tags);
+      return res.json(normalizePromptResult(tags));
     }
 
     const finalApiKey = apiKey || process.env.GEMINI_API_KEY;
@@ -335,7 +350,19 @@ export default async function handler(req, res) {
             },
             character: {
               type: Type.ARRAY,
-              description: 'Tags describing characters, subjects, clothing, hair, expressions, and physical attributes.',
+              description: 'Tags describing characters, subjects, hair, eyes, facial features, expressions, and physical attributes (excluding clothing).',
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  en: { type: Type.STRING, description: 'English prompt tag' },
+                  zh: { type: Type.STRING, description: 'Chinese translation' },
+                },
+                required: ['en', 'zh'],
+              },
+            },
+            clothing: {
+              type: Type.ARRAY,
+              description: 'Tags specifically describing clothing, attire, outfits, fabrics, garments, shoes, and wearable accessories.',
               items: {
                 type: Type.OBJECT,
                 properties: {
@@ -382,7 +409,7 @@ export default async function handler(req, res) {
               },
             },
           },
-          required: ['style', 'character', 'action', 'environment', 'composition'],
+          required: ['style', 'character', 'clothing', 'action', 'environment', 'composition'],
         },
       },
     });
@@ -398,7 +425,7 @@ export default async function handler(req, res) {
     }
 
     const tags = parseModelJson(text, aiResponse.candidates?.[0]?.finishReason);
-    return res.json(tags);
+    return res.json(normalizePromptResult(tags));
   } catch (error) {
     console.error('Error analyzing image:', error);
     return res.status(500).json({ error: 'Failed to analyze image', details: error instanceof Error ? error.message : String(error) });

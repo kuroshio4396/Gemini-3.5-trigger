@@ -6,6 +6,7 @@ export interface Tag {
 export interface PromptData {
   style: Tag[];
   character: Tag[];
+  clothing: Tag[];
   action: Tag[];
   environment: Tag[];
   composition: Tag[];
@@ -22,6 +23,7 @@ export interface AppSettings {
 export const categoryLabels: Record<Category, string> = {
   style: '画风提示词 (Style)',
   character: '人物提示词 (Character)',
+  clothing: '服装提示词 (Clothing)',
   action: '动作提示词 (Action)',
   environment: '环境提示词 (Environment)',
   composition: '构图提示词 (Composition)',

@@ -10,10 +10,13 @@ interface PromptResultsProps {
 const categoryStyles: Record<Category, { dot: string, bg: string, border: string, textEn: string, textZh: string, titleEn: string, titleZh: string, colSpan?: string }> = {
   style: { dot: 'bg-blue-500', bg: 'bg-blue-50', border: 'border-blue-100', textEn: 'text-blue-700', textZh: 'text-blue-400', titleEn: 'Art Style', titleZh: '画风提示词' },
   character: { dot: 'bg-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100', textEn: 'text-emerald-700', textZh: 'text-emerald-400', titleEn: 'Character', titleZh: '人物提示词' },
+  clothing: { dot: 'bg-teal-500', bg: 'bg-teal-50', border: 'border-teal-100', textEn: 'text-teal-700', textZh: 'text-teal-400', titleEn: 'Clothing', titleZh: '服装提示词' },
   action: { dot: 'bg-amber-500', bg: 'bg-amber-50', border: 'border-amber-100', textEn: 'text-amber-700', textZh: 'text-amber-400', titleEn: 'Action', titleZh: '动作提示词' },
   environment: { dot: 'bg-purple-500', bg: 'bg-purple-50', border: 'border-purple-100', textEn: 'text-purple-700', textZh: 'text-purple-400', titleEn: 'Environment', titleZh: '环境提示词' },
-  composition: { dot: 'bg-rose-500', bg: 'bg-rose-50', border: 'border-rose-100', textEn: 'text-rose-700', textZh: 'text-rose-400', titleEn: 'Composition', titleZh: '构图提示词', colSpan: 'col-span-2 row-span-1' },
+  composition: { dot: 'bg-rose-500', bg: 'bg-rose-50', border: 'border-rose-100', textEn: 'text-rose-700', textZh: 'text-rose-400', titleEn: 'Composition', titleZh: '构图提示词' },
 };
+
+const CATEGORY_ORDER: Category[] = ['style', 'character', 'clothing', 'action', 'environment', 'composition'];
 
 export function PromptResults({ data }: PromptResultsProps) {
   const [copiedSection, setCopiedSection] = React.useState<string | null>(null);
@@ -31,7 +34,7 @@ export function PromptResults({ data }: PromptResultsProps) {
 
   const allPrompts = useMemo(() => {
     if (!data) return '';
-    const all = Object.values(data).flatMap(tags => tags.map(t => copyLanguage === 'en' ? t.en : t.zh));
+    const all = CATEGORY_ORDER.flatMap(cat => (data[cat] || []).map(t => copyLanguage === 'en' ? t.en : t.zh));
     return all.join(', ');
   }, [data, copyLanguage]);
 
@@ -112,8 +115,6 @@ export function PromptResults({ data }: PromptResultsProps) {
     );
   };
 
-  const categories: Category[] = ['style', 'character', 'action', 'environment', 'composition'];
-
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -121,7 +122,7 @@ export function PromptResults({ data }: PromptResultsProps) {
       className="flex-1 flex flex-col overflow-hidden gap-4"
     >
       <div className="grid grid-cols-2 grid-rows-3 flex-1 gap-4 overflow-hidden">
-        {categories.map(renderCategory)}
+        {CATEGORY_ORDER.map(renderCategory)}
       </div>
 
       <div className="h-14 bg-white border border-slate-200 rounded-xl px-4 flex items-center justify-between shrink-0 shadow-sm">

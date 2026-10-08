@@ -106,11 +106,12 @@ export function BatchProcessor({ settings, filterR18, multiCharacterMode, animaM
 
   const generatePromptText = (data: PromptData): string => {
     const allTags = [
-      ...data.style,
-      ...data.character,
-      ...data.action,
-      ...data.environment,
-      ...data.composition
+      ...(data.style || []),
+      ...(data.character || []),
+      ...(data.clothing || []),
+      ...(data.action || []),
+      ...(data.environment || []),
+      ...(data.composition || [])
     ];
     return allTags.map(tag => tag.en).join(', ');
   };
